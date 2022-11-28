@@ -1,4 +1,10 @@
-# Simple [Asterisk Manager Interface](https://wiki.asterisk.org/wiki/pages/viewpage.action?pageId=4817239) Helper
+# [Asterisk Manager Interface](https://wiki.asterisk.org/wiki/pages/viewpage.action?pageId=4817239)
+
+## Documentation
+
+[https://gibme-npm.github.io/asterisk-manager-interface/](https://gibme-npm.github.io/asterisk-manager-interface/)
+
+## Sample Code
 
 ```typescript
 import AMI from '@gibme/asterisk-manager-interface';

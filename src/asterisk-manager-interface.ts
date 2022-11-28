@@ -1,50 +1,87 @@
-// Copyright (c) 2016-2022 Brandon Lehmann
+// Copyright (c) 2016-2022, Brandon Lehmann <brandonlehmann@gmail.com>
 //
-// Please see the included LICENSE file for more information.
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-import { createConnection, Socket } from 'net';
+import { Socket } from 'net';
 import { EventEmitter } from 'events';
 import { v4 } from 'uuid';
-import { AMI } from './types';
+import { AMI as AMITypes } from './types';
 import PayloadManager from './payload-manager';
-export { AMI };
+import Timer from '@gibme/timer';
+export { AMITypes };
 
-export const cleanupStatus = (elem: any): any => {
-    elem.Time = -1;
-    elem.Online = false;
+/**
+ * Helps to clean up any status type responses
+ *
+ * @param elem
+ */
+export const cleanupStatus = <Type = any>(elem: Type): Type => {
+    (elem as any).Time = -1;
+    (elem as any).Online = false;
 
-    if (typeof elem.Status === 'undefined') {
-        elem.Status = 'UNKNOWN';
-    } else if (elem.Status.toUpperCase().includes('OK')) {
-        if (elem.Status.includes('ms')) {
-            elem.Time = parseInt(elem.Status.split('(')[1].split(' ms')[0]);
+    if (typeof (elem as any).Status === 'undefined') {
+        (elem as any).Status = 'UNKNOWN';
+    } else if ((elem as any).Status.toUpperCase().includes('OK')) {
+        if ((elem as any).Status.includes('ms')) {
+            (elem as any).Time = parseInt((elem as any).Status.split('(')[1].split(' ms')[0]);
         }
-        elem.Online = true;
-        elem.Status = elem.Status.split(' ')[0];
+        (elem as any).Online = true;
+        (elem as any).Status = (elem as any).Status.split(' ')[0];
     }
 
     return elem;
 };
 
-interface OptionalOptions {
+export interface OptionalOptions {
     host: string;
     port: number;
     defaultMaxListeners: number;
+    /**
+     * @default true
+     */
+    autoReconnect: boolean;
+    /**
+     * @default true
+     */
+    keepAlive: boolean;
+    /**
+     * Keep alive interval in milliseconds
+     *
+     * @default 30000
+     */
+    keepAliveInterval: number;
 }
 
-interface RequiredOptions {
+export interface RequiredOptions {
     user: string;
     password: string;
 }
 
-interface AMIConnectionOptions extends Partial<OptionalOptions>, RequiredOptions {}
-interface AMIConnectionOptionsFinal extends OptionalOptions, RequiredOptions {}
+export interface AMIConnectionOptions extends Partial<OptionalOptions>, RequiredOptions {}
+export interface AMIConnectionOptionsFinal extends OptionalOptions, RequiredOptions {}
 
 export default class AsteriskManagerInterface extends EventEmitter {
     private _socket?: Socket;
     private _payloadManager = new PayloadManager();
     private options: AMIConnectionOptionsFinal;
     private _authenticated = false;
+    private _keepAliveTimer?: Timer;
 
     /**
      * Constructs a new instance of AMI connection
@@ -56,6 +93,9 @@ export default class AsteriskManagerInterface extends EventEmitter {
         options.host ||= '127.0.0.1';
         options.port ||= 5038;
         options.defaultMaxListeners ||= 20;
+        options.autoReconnect ??= true;
+        options.keepAlive ??= true;
+        options.keepAliveInterval ||= 30_000;
 
         this.options = options as any;
 
@@ -90,9 +130,22 @@ export default class AsteriskManagerInterface extends EventEmitter {
     }
 
     /**
+     * Pings the AMI connection (keepalive)
+     */
+    public async ping (): Promise<boolean> {
+        const response = await this.send<AMITypes.Pong>({
+            Action: 'Ping'
+        });
+
+        return response.Response === 'Success' && response.Ping === 'Pong';
+    }
+
+    /**
      * Closes the connection to the server
      */
     public async close (): Promise<void> {
+        this._keepAliveTimer?.destroy();
+
         this._authenticated = false;
 
         this._payloadManager.stop();
@@ -114,7 +167,7 @@ export default class AsteriskManagerInterface extends EventEmitter {
     ): Promise<boolean> {
         await this.init();
 
-        const response = await this.send<AMI.Login>({
+        const response = await this.send<AMITypes.Login>({
             Action: 'Login',
             Username: user,
             Secret: password,
@@ -123,6 +176,16 @@ export default class AsteriskManagerInterface extends EventEmitter {
 
         if (response.Response === 'Success') {
             this._authenticated = true;
+
+            if (this.options.keepAlive) {
+                this._keepAliveTimer = new Timer(this.options.keepAliveInterval, true);
+
+                this._keepAliveTimer.on('tick', async () => {
+                    try {
+                        await this.ping();
+                    } catch {}
+                });
+            }
 
             this._socket?.on('end', async () => await this.handleReconnect());
             this._socket?.on('error', async (error: Error) => await this.handleReconnect(error));
@@ -154,8 +217,8 @@ export default class AsteriskManagerInterface extends EventEmitter {
      *
      * @param payload
      */
-    public async send<ResponseType extends AMI.AMIPayload = any,
-        RequestType extends AMI.AMIRequest = any> (
+    public async send<ResponseType extends AMITypes.AMIPayload = any,
+        RequestType extends AMITypes.AMIRequest = any> (
         payload: RequestType
     ): Promise<ResponseType> {
         return this.write(payload);
@@ -166,15 +229,12 @@ export default class AsteriskManagerInterface extends EventEmitter {
      *
      * @private
      */
-    private async init () {
+    private async init (): Promise<void> {
         await this.close();
 
         this._payloadManager.start();
 
-        this._socket = createConnection(this.options.port, this.options.host);
-        this._socket.setKeepAlive(true);
-        this._socket.setNoDelay(true);
-
+        this._socket = new Socket();
         this._socket.on('close', (hadError: boolean) => this.emit('close', hadError));
 
         this._socket.once('data', data => {
@@ -184,6 +244,26 @@ export default class AsteriskManagerInterface extends EventEmitter {
         });
 
         this._socket.on('data', data => this._payloadManager.incoming(data));
+
+        return new Promise((resolve, reject) => {
+            if (!this._socket) {
+                return reject(new Error('Socket unavailable'));
+            }
+
+            this._socket?.once('error', error => reject(error));
+
+            this._socket?.connect({
+                port: this.options.port,
+                host: this.options.host,
+                keepAlive: true,
+                noDelay: true
+            }, () => {
+                this._socket?.removeAllListeners('error');
+                this._socket?.on('error', error => this.emit('close', error));
+
+                return resolve();
+            });
+        });
     }
 
     /**
@@ -196,8 +276,11 @@ export default class AsteriskManagerInterface extends EventEmitter {
         if (error) {
             this.emit('error', error);
         }
-        if (!this._socket?.destroyed) {
+
+        if (!this._socket?.destroyed && this.options.autoReconnect) {
             await this.init();
+        } else {
+            await this.close();
         }
     }
 
@@ -207,8 +290,8 @@ export default class AsteriskManagerInterface extends EventEmitter {
      * @param payload
      * @private
      */
-    private async write<ResponseType extends AMI.AMIPayload = any,
-        RequestType extends AMI.AMIRequest = any> (
+    private async write<ResponseType extends AMITypes.AMIPayload = any,
+        RequestType extends AMITypes.AMIRequest = any> (
         payload: RequestType
     ): Promise<ResponseType> {
         if (!this.authenticated && payload.Action !== 'Login') {
@@ -229,10 +312,12 @@ export default class AsteriskManagerInterface extends EventEmitter {
             const _request = `${request.join('\r\n')}\r\n\r\n`;
 
             const result: any[] = [];
+
             const handler = (response: any) => {
                 if (response.ActionID === uuid) {
                     result.push(response);
                 }
+
                 if (result.length === 0) return;
 
                 if (result[0].Response !== 'Success') {
@@ -273,3 +358,5 @@ export default class AsteriskManagerInterface extends EventEmitter {
         });
     }
 }
+
+export { AsteriskManagerInterface };
