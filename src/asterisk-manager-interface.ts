@@ -66,6 +66,11 @@ export interface OptionalOptions {
      * @default 30000
      */
     keepAliveInterval: number;
+    /**
+     * The number of milliseconds to wait for the underlying socket to connect
+     * @default 5000
+     */
+    connectionTimeout: number;
 }
 
 export interface RequiredOptions {
@@ -96,6 +101,7 @@ export default class AsteriskManagerInterface extends EventEmitter {
         options.autoReconnect ??= true;
         options.keepAlive ??= true;
         options.keepAliveInterval ||= 30_000;
+        options.connectionTimeout ||= 5_000;
 
         this.options = options as any;
 
@@ -250,6 +256,13 @@ export default class AsteriskManagerInterface extends EventEmitter {
                 return reject(new Error('Socket unavailable'));
             }
 
+            // if we don't connect in the time allowed, we aren't going to connect
+            const timer = setTimeout(() => {
+                this._socket?.destroy();
+
+                return reject(new Error('Connection timed out'));
+            }, this.options.connectionTimeout);
+
             this._socket?.once('error', error => reject(error));
 
             this._socket?.connect({
@@ -258,6 +271,8 @@ export default class AsteriskManagerInterface extends EventEmitter {
                 keepAlive: true,
                 noDelay: true
             }, () => {
+                clearTimeout(timer);
+
                 this._socket?.removeAllListeners('error');
                 this._socket?.on('error', error => this.emit('close', error));
 
