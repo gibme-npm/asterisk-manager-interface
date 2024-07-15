@@ -1,6 +1,6 @@
 {
   "name": "@gibme/asterisk-manager-interface",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Asterisk Manager Interface",
   "main": "dist/asterisk-manager-interface.js",
   "types": "dist/asterisk-manager-interface.d.ts",
@@ -38,9 +38,9 @@
     "email": "brandonlehmann@gmail.com"
   },
   "dependencies": {
-    "@gibme/timer": "^1.0.6",
-    "@types/uuid": "^9.0.8",
-    "uuid": "^9.0.1"
+    "@gibme/timer": "^1.0.10",
+    "@types/uuid": "^10.0.0",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",
