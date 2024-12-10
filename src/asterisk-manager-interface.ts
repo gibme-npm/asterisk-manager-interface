@@ -24,6 +24,7 @@ import { v4 } from 'uuid';
 import { AMI as AMITypes } from './types';
 import PayloadManager from './payload-manager';
 import Timer from '@gibme/timer';
+
 export { AMITypes };
 
 /**
@@ -144,6 +145,114 @@ export default class AsteriskManagerInterface extends EventEmitter {
         });
 
         return response.Response === 'Success' && response.Ping === 'Pong';
+    }
+
+    /**
+     * Deletes a Database entry
+     *
+     * @param family
+     * @param key
+     */
+    public async db_del (family: string, key: string): Promise<boolean> {
+        const response = await this.send<AMITypes.AMIPayload>({
+            Action: 'DBDel',
+            Family: family,
+            Key: key
+        });
+
+        return response.Response === 'Success';
+    }
+
+    /**
+     * Deletes the Database tree
+     *
+     * @param family
+     * @param key
+     */
+    public async db_del_tree (family: string, key: string): Promise<boolean> {
+        const response = await this.send<AMITypes.AMIPayload>({
+            Action: 'DBDelTree',
+            Family: family,
+            Key: key
+        });
+
+        return response.Response === 'Success';
+    }
+
+    /**
+     * Gets a Database entry
+     *
+     * @param family
+     * @param key
+     */
+    public async db_get (family: string, key: string): Promise<{ key: string, value: string } | undefined> {
+        try {
+            const response = await this.send<AMITypes.AMIPayloadWithList<{ Key: string; Val: string; }>>({
+                Action: 'DBGet',
+                Family: family,
+                Key: key
+            });
+
+            return response.List.map(record => {
+                return {
+                    key: `/${family}/${record.Key}`,
+                    value: record.Val
+                };
+            }).shift();
+        } catch {
+            return undefined;
+        }
+    }
+
+    /**
+     * Gets Database entries, optionally at a particular family/key
+     *
+     * @param family
+     * @param key
+     */
+    public async db_get_tree (family?: string, key?: string): Promise<{ key: string; value: string }[]> {
+        try {
+            const request: AMITypes.AMIRequest = {
+                Action: 'DBGetTree'
+            };
+
+            if (family) {
+                request.Family = family;
+
+                if (key) {
+                    request.Key = key;
+                }
+            }
+
+            const response = await this.send<AMITypes.AMIPayloadWithList<{ Key: string; Val: string; }>>(request);
+
+            return response.List.map(record => {
+                return {
+                    key: record.Key,
+                    value: record.Val
+                };
+            });
+        } catch {
+            return [];
+        }
+    }
+
+    /**
+     * Puts a Database entry
+     *
+     * @param family
+     * @param key
+     * @param value
+     */
+    public async db_put (family: string, key: string, value: string): Promise<boolean> {
+        const response = await this.send<AMITypes.AMIPayload>({
+            Action: 'DBPut',
+            Family: family,
+            Key: key,
+            Val: value
+        });
+
+        return response.Response === 'Success';
     }
 
     /**
