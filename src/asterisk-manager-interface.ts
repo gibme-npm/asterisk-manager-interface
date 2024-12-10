@@ -62,6 +62,10 @@ export interface OptionalOptions {
      */
     keepAlive: boolean;
     /**
+     * @default 500 ms
+     */
+    readInterval: number;
+    /**
      * Keep alive interval in milliseconds
      *
      * @default 30000
@@ -84,7 +88,7 @@ export interface AMIConnectionOptionsFinal extends OptionalOptions, RequiredOpti
 
 export default class AsteriskManagerInterface extends EventEmitter {
     private _socket?: Socket;
-    private _payloadManager = new PayloadManager();
+    private _payloadManager;
     private options: AMIConnectionOptionsFinal;
     private _authenticated = false;
     private _keepAliveTimer?: Timer;
@@ -103,10 +107,13 @@ export default class AsteriskManagerInterface extends EventEmitter {
         options.keepAlive ??= true;
         options.keepAliveInterval ||= 30_000;
         options.connectionTimeout ||= 5_000;
+        options.readInterval ||= 500;
 
         this.options = options as any;
 
         this.setMaxListeners(this.options.defaultMaxListeners);
+
+        this._payloadManager = new PayloadManager(this.options.readInterval);
 
         this._payloadManager.on('packet', payload => this.emit('response', payload));
     }
