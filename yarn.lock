@@ -41,10 +41,10 @@
   resolved "https://registry.yarnpkg.com/@eslint/js/-/js-8.57.0.tgz#a5417ae8427873f1dd08b70b3574b453e67b5f7f"
   integrity sha512-Ys+3g2TaW7gADOJzPt83SJtCDhMjndcDMFVQ/Tj9iA1BfJzFKD9mAUXT3OenpuPHbI6P/myECxRJrofUsDx/5g==
 
-"@gibme/timer@^1.0.10":
-  version "1.0.10"
-  resolved "https://registry.yarnpkg.com/@gibme/timer/-/timer-1.0.10.tgz#f6ff2a5df96b538b1a287fdaf5b6d9db624b33cb"
-  integrity sha512-aFdchYrog/1xgZ91XRRIQ3Irj+0o24lqog/xzUwTDpcjnZRuClSD3sMYjH0zg3oByuEXfrkNFPSuAaoMDCmhCw==
+"@gibme/timer@^1.0.13":
+  version "1.0.13"
+  resolved "https://registry.yarnpkg.com/@gibme/timer/-/timer-1.0.13.tgz#ef450b7c54517a834bc267207e5e81e7992741c1"
+  integrity sha512-Basv9F8HsyZ39fGYtkPWd8LgA1Vj6D3wb+OGc8q1/TSD5putsqD1olT+TxwSyxOGImSqwDm1hyOwM9sRKVg8qg==
 
 "@humanwhocodes/config-array@^0.11.14":
   version "0.11.14"
@@ -2113,10 +2113,10 @@ uri-js@^4.2.2:
   dependencies:
     punycode "^2.1.0"
 
-uuid@^10.0.0:
-  version "10.0.0"
-  resolved "https://registry.yarnpkg.com/uuid/-/uuid-10.0.0.tgz#5a95aa454e6e002725c79055fd42aaba30ca6294"
-  integrity sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==
+uuid@^11.0.3:
+  version "11.0.3"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-11.0.3.tgz#248451cac9d1a4a4128033e765d137e2b2c49a3d"
+  integrity sha512-d0z310fCWv5dJwnX1Y/MncBAqGMKEzlBb1AOf7z9K8ALnd0utBX/msg/fA0+sbyN1ihbMsLhrBlnl1ak7Wa0rg==
 
 v8-compile-cache-lib@^3.0.1:
   version "3.0.1"
