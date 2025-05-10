@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2022, Brandon Lehmann <brandonlehmann@gmail.com>
+// Copyright (c) 2016-2025, Brandon Lehmann <brandonlehmann@gmail.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,11 +21,8 @@
 import { Socket } from 'net';
 import { EventEmitter } from 'events';
 import { v4 } from 'uuid';
-import { AMI as AMITypes } from './types';
-import PayloadManager from './payload-manager';
+import { PayloadManager } from './payload-manager';
 import Timer from '@gibme/timer';
-
-export { AMITypes };
 
 /**
  * Helps to clean up any status type responses
@@ -49,47 +46,9 @@ export const cleanupStatus = <Type = any>(elem: Type): Type => {
     return elem;
 };
 
-export interface OptionalOptions {
-    host: string;
-    port: number;
-    defaultMaxListeners: number;
-    /**
-     * @default true
-     */
-    autoReconnect: boolean;
-    /**
-     * @default true
-     */
-    keepAlive: boolean;
-    /**
-     * @default 500 ms
-     */
-    readInterval: number;
-    /**
-     * Keep alive interval in milliseconds
-     *
-     * @default 30000
-     */
-    keepAliveInterval: number;
-    /**
-     * The number of milliseconds to wait for the underlying socket to connect
-     * @default 5000
-     */
-    connectionTimeout: number;
-}
-
-export interface RequiredOptions {
-    user: string;
-    password: string;
-}
-
-export interface AMIConnectionOptions extends Partial<OptionalOptions>, RequiredOptions {}
-export interface AMIConnectionOptionsFinal extends OptionalOptions, RequiredOptions {}
-
-export default class AsteriskManagerInterface extends EventEmitter {
+export class AsteriskManagerInterface extends EventEmitter {
     private _socket?: Socket;
     private _payloadManager;
-    private options: AMIConnectionOptionsFinal;
     private _authenticated = false;
     private _keepAliveTimer?: Timer;
 
@@ -97,19 +56,17 @@ export default class AsteriskManagerInterface extends EventEmitter {
      * Constructs a new instance of AMI connection
      * @param options
      */
-    constructor (options: AMIConnectionOptions) {
+    constructor (private readonly options: AsteriskManagerInterface.Options) {
         super();
 
-        options.host ||= '127.0.0.1';
-        options.port ||= 5038;
-        options.defaultMaxListeners ||= 20;
-        options.autoReconnect ??= true;
-        options.keepAlive ??= true;
-        options.keepAliveInterval ||= 30_000;
-        options.connectionTimeout ||= 5_000;
-        options.readInterval ||= 500;
-
-        this.options = options as any;
+        this.options.host ??= '127.0.0.1';
+        this.options.port ??= 5038;
+        this.options.defaultMaxListeners ??= 20;
+        this.options.autoReconnect ??= true;
+        this.options.keepAlive ??= true;
+        this.options.keepAliveInterval ??= 30_000;
+        this.options.connectionTimeout ??= 5_000;
+        this.options.readInterval ??= 500;
 
         this.setMaxListeners(this.options.defaultMaxListeners);
 
@@ -147,7 +104,7 @@ export default class AsteriskManagerInterface extends EventEmitter {
      * Pings the AMI connection (keepalive)
      */
     public async ping (): Promise<boolean> {
-        const response = await this.send<AMITypes.Pong>({
+        const response = await this.send<AsteriskManagerInterface.Response.Pong>({
             Action: 'Ping'
         });
 
@@ -161,7 +118,7 @@ export default class AsteriskManagerInterface extends EventEmitter {
      * @param key
      */
     public async db_del (family: string, key: string): Promise<boolean> {
-        const response = await this.send<AMITypes.AMIPayload>({
+        const response = await this.send<AsteriskManagerInterface.Response.Payload>({
             Action: 'DBDel',
             Family: family,
             Key: key
@@ -177,7 +134,7 @@ export default class AsteriskManagerInterface extends EventEmitter {
      * @param key
      */
     public async db_del_tree (family: string, key: string): Promise<boolean> {
-        const response = await this.send<AMITypes.AMIPayload>({
+        const response = await this.send<AsteriskManagerInterface.Response.Payload>({
             Action: 'DBDelTree',
             Family: family,
             Key: key
@@ -194,11 +151,12 @@ export default class AsteriskManagerInterface extends EventEmitter {
      */
     public async db_get (family: string, key: string): Promise<{ key: string, value: string } | undefined> {
         try {
-            const response = await this.send<AMITypes.AMIPayloadWithList<{ Key: string; Val: string; }>>({
-                Action: 'DBGet',
-                Family: family,
-                Key: key
-            });
+            const response =
+                await this.send<AsteriskManagerInterface.Response.ListPayload<{ Key: string; Val: string; }>>({
+                    Action: 'DBGet',
+                    Family: family,
+                    Key: key
+                });
 
             return response.List.map(record => {
                 return {
@@ -219,7 +177,7 @@ export default class AsteriskManagerInterface extends EventEmitter {
      */
     public async db_get_tree (family?: string, key?: string): Promise<{ key: string; value: string }[]> {
         try {
-            const request: AMITypes.AMIRequest = {
+            const request: AsteriskManagerInterface.Request.Payload = {
                 Action: 'DBGetTree'
             };
 
@@ -231,7 +189,8 @@ export default class AsteriskManagerInterface extends EventEmitter {
                 }
             }
 
-            const response = await this.send<AMITypes.AMIPayloadWithList<{ Key: string; Val: string; }>>(request);
+            const response =
+                await this.send<AsteriskManagerInterface.Response.ListPayload<{ Key: string; Val: string; }>>(request);
 
             return response.List.map(record => {
                 return {
@@ -252,7 +211,7 @@ export default class AsteriskManagerInterface extends EventEmitter {
      * @param value
      */
     public async db_put (family: string, key: string, value: string): Promise<boolean> {
-        const response = await this.send<AMITypes.AMIPayload>({
+        const response = await this.send<AsteriskManagerInterface.Response.Payload>({
             Action: 'DBPut',
             Family: family,
             Key: key,
@@ -260,6 +219,102 @@ export default class AsteriskManagerInterface extends EventEmitter {
         });
 
         return response.Response === 'Success';
+    }
+
+    /**
+     * Returns if the chan_sip module is available
+     */
+    public async has_chan_sip (): Promise<boolean> {
+        return this.moduleCheck('chan_sip');
+    }
+
+    /**
+     * Returns if the chan_pjsip module is available
+     */
+    public async has_chan_pjsip (): Promise<boolean> {
+        return this.moduleCheck('chan_pjsip');
+    }
+
+    /**
+     * Returns if the chan_iax2 module is available
+     */
+    public async has_chan_iax2 (): Promise<boolean> {
+        return this.moduleCheck('chan_iax2');
+    }
+
+    /**
+     * Attempts to return a list of the SIP peers
+     */
+    public async sip_peers (): Promise<AsteriskManagerInterface.SIP.Peer[]> {
+        try {
+            const response = await this.send<AsteriskManagerInterface.Response.SIP.Peers>({
+                Action: 'SIPPeers'
+            });
+
+            return response.List;
+        } catch {
+            return [];
+        }
+    }
+
+    /**
+     * Attempts to return a list of the PJSIP endpoints
+     */
+    public async pjsip_endpoints (): Promise<AsteriskManagerInterface.PJSIP.Endpoint[]> {
+        try {
+            const response = await this.send<AsteriskManagerInterface.Response.PJSIP.Endpoints>({
+                Action: 'PJSIPEndpoints'
+            });
+
+            return response.List;
+        } catch {
+            return [];
+        }
+    }
+
+    /**
+     * Attempts to return a list of the PJSIP contacts
+     */
+    public async pjsip_contacts (): Promise<AsteriskManagerInterface.PJSIP.Contact[]> {
+        try {
+            const response = await this.send<AsteriskManagerInterface.Response.PJSIP.Contacts>({
+                Action: 'PJSIPContacts'
+            });
+
+            return response.List;
+        } catch {
+            return [];
+        }
+    }
+
+    /**
+     * Attempts to return a list of the current channels
+     */
+    public async channels (): Promise<AsteriskManagerInterface.Core.Channel[]> {
+        try {
+            const response = await this.send<AsteriskManagerInterface.Response.Core.Channels>({
+                Action: 'CoreShowChannels'
+            });
+
+            return response.List;
+        } catch {
+            return [];
+        }
+    }
+
+    /**
+     * Attempts to return a list of the IAX2 peers
+     */
+    public async iax2_peers (): Promise<AsteriskManagerInterface.IAX2.Peer[]> {
+        try {
+            const response = await this.send<AsteriskManagerInterface.Response.IAX2.Peers>({
+                Action: 'IAX2Peers'
+            });
+
+            return response.List;
+        } catch {
+            return [];
+        }
     }
 
     /**
@@ -289,7 +344,7 @@ export default class AsteriskManagerInterface extends EventEmitter {
     ): Promise<boolean> {
         await this.init();
 
-        const response = await this.send<AMITypes.Login>({
+        const response = await this.send<AsteriskManagerInterface.Response.Login>({
             Action: 'Login',
             Username: user,
             Secret: password,
@@ -299,7 +354,7 @@ export default class AsteriskManagerInterface extends EventEmitter {
         if (response.Response === 'Success') {
             this._authenticated = true;
 
-            if (this.options.keepAlive) {
+            if (this.options.keepAlive && this.options.keepAliveInterval) {
                 this._keepAliveTimer = new Timer(this.options.keepAliveInterval, true);
 
                 this._keepAliveTimer.on('tick', async () => {
@@ -339,8 +394,8 @@ export default class AsteriskManagerInterface extends EventEmitter {
      *
      * @param payload
      */
-    public async send<ResponseType extends AMITypes.AMIPayload = any,
-        RequestType extends AMITypes.AMIRequest = any> (
+    public async send<ResponseType extends AsteriskManagerInterface.Response.Payload = any,
+        RequestType extends AsteriskManagerInterface.Request.Payload = any> (
         payload: RequestType
     ): Promise<ResponseType> {
         return this.write(payload);
@@ -381,19 +436,23 @@ export default class AsteriskManagerInterface extends EventEmitter {
 
             this._socket?.once('error', error => reject(error));
 
-            this._socket?.connect({
-                port: this.options.port,
-                host: this.options.host,
-                keepAlive: true,
-                noDelay: true
-            }, () => {
-                clearTimeout(timer);
+            if (this.options.host && this.options.port) {
+                this._socket?.connect({
+                    port: this.options.port,
+                    host: this.options.host,
+                    keepAlive: true,
+                    noDelay: true
+                }, () => {
+                    clearTimeout(timer);
 
-                this._socket?.removeAllListeners('error');
-                this._socket?.on('error', error => this.emit('close', error));
+                    this._socket?.removeAllListeners('error');
+                    this._socket?.on('error', error => this.emit('close', error));
 
-                return resolve();
-            });
+                    return resolve();
+                });
+            } else {
+                return reject(new Error('Invalid host and/or port'));
+            }
         });
     }
 
@@ -421,8 +480,8 @@ export default class AsteriskManagerInterface extends EventEmitter {
      * @param payload
      * @private
      */
-    private async write<ResponseType extends AMITypes.AMIPayload = any,
-        RequestType extends AMITypes.AMIRequest = any> (
+    private async write<ResponseType extends AsteriskManagerInterface.Response.Payload = any,
+        RequestType extends AsteriskManagerInterface.Request.Payload = any> (
         payload: RequestType
     ): Promise<ResponseType> {
         if (!this.authenticated && payload.Action !== 'Login') {
@@ -490,4 +549,201 @@ export default class AsteriskManagerInterface extends EventEmitter {
     }
 }
 
-export { AsteriskManagerInterface };
+export namespace AsteriskManagerInterface {
+    export type Options = {
+        /**
+         * The AMI username
+         */
+        user: string;
+        /**
+         * The AMI password
+         */
+        password: string;
+        /**
+         * The AMI host
+         */
+        host?: string;
+        /**
+         * The API port
+         */
+        port?: number;
+        /**
+         * Whether to auto reconnect
+         * @default true
+         */
+        autoReconnect?: boolean;
+        /**
+         * @default true
+         */
+        keepAlive?: boolean;
+        /**
+         * @default 500 ms
+         */
+        readInterval?: number;
+        /**
+         * Keep alive interval in milliseconds
+         *
+         * @default 30000
+         */
+        keepAliveInterval?: number;
+        /**
+         * The number of milliseconds to wait for the underlying socket to connect
+         * @default 5000
+         */
+        connectionTimeout?: number;
+        /**
+         * The default max listeners for the event emitter
+         * @default 20
+         */
+        defaultMaxListeners?: number;
+    }
+
+    export namespace PJSIP {
+        export type Endpoint = {
+            ObjectType: string;
+            ObjectName: string;
+            Transport: string;
+            Aor: number;
+            Auths: string;
+            OutboundAuths: string;
+            Contacts: string;
+            DeviceState: string;
+            ActiveChannels: string;
+        }
+
+        export type Contact = {
+            ObjectType: string;
+            ObjectName: string;
+            ViaAddr: string;
+            QualifyTimeout: number;
+            CallId: string;
+            RegServer: string;
+            PruneOnBoot: boolean;
+            Path: string;
+            Endpoint: string;
+            ViaPort: number;
+            AuthenticateQualify: boolean;
+            Uri: string;
+            QualifyFrequency: number;
+            UserAgent: string;
+            ExpirationTime: string;
+            OutboundProxy: string;
+            Status: string;
+            RoundtripUsec: number;
+        }
+    }
+
+    export namespace SIP {
+        export type Peer = {
+            Channeltype: string;
+            ObjectName: string;
+            ChanObjectType: string;
+            IPaddress: string;
+            IPport: number;
+            Dynamic: boolean;
+            AutoForcerport: boolean;
+            Forcerport: boolean;
+            AutoComedia: boolean;
+            Comedia: boolean;
+            VideoSupport: boolean;
+            TextSupport: boolean;
+            ACL: boolean;
+            Status: string;
+            Time: number;
+            RealtimeDevice: boolean;
+            Description: string;
+            Accoundcode: string;
+            Online: boolean;
+        }
+    }
+
+    export namespace IAX2 {
+        export type Peer = {
+            Channeltype: string;
+            ObjectName: string;
+            ChanObjectType: string;
+            IPaddress: string;
+            Mask: string;
+            Port: number;
+            Dynamic: boolean;
+            Trunk: boolean;
+            Encryption: boolean;
+            Status: string;
+            Time: number;
+            Online: boolean;
+        }
+    }
+
+    export namespace Core {
+        export type Channel = {
+            Channel: string;
+            ChannelState: string;
+            ChannelStateDesc: string;
+            CallerIDNum: string;
+            CallerIDName: string;
+            ConnectedLineNum: string;
+            ConnectedLineName: string;
+            Language: string;
+            AccountCode: string;
+            Context: string;
+            Exten: string;
+            Priority: string;
+            Uniqueid: string;
+            Linkedid: string;
+            Application: string;
+            ApplicationData: string;
+            Duration: string;
+            BridgeId: string;
+        }
+    }
+
+    export namespace Response {
+        export type Payload = {
+            Response: string;
+            Message?: string;
+            ActionID: string;
+
+            [key: string]: any;
+        }
+
+        export type ListPayload<Type> = Payload & {
+            List: Type[];
+            ListItems: number;
+        }
+
+        export type Login = Payload;
+
+        export type Pong = Payload & {
+            Ping: string;
+            Timestamp: string;
+        }
+
+        export namespace PJSIP {
+            export type Endpoints = ListPayload<AsteriskManagerInterface.PJSIP.Endpoint>;
+
+            export type Contacts = ListPayload<AsteriskManagerInterface.PJSIP.Contact>;
+        }
+
+        export namespace SIP {
+            export type Peers = ListPayload<AsteriskManagerInterface.SIP.Peer>;
+        }
+
+        export namespace IAX2 {
+            export type Peers = ListPayload<AsteriskManagerInterface.IAX2.Peer>;
+        }
+
+        export namespace Core {
+            export type Channels = ListPayload<AsteriskManagerInterface.Core.Channel>;
+        }
+    }
+
+    export namespace Request {
+        export type Payload = {
+            Action: string;
+
+            [key: string]: any;
+        }
+    }
+}
+
+export default AsteriskManagerInterface;

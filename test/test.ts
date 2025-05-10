@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2022, Brandon Lehmann <brandonlehmann@gmail.com>
+// Copyright (c) 2016-2025, Brandon Lehmann <brandonlehmann@gmail.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,10 +19,10 @@
 // SOFTWARE.
 
 import { describe, it } from 'mocha';
-import AsteriskManagerInterface from '../src/asterisk-manager-interface';
-import * as dotenv from 'dotenv';
+import AsteriskManagerInterface from '../src';
+import { config } from 'dotenv';
 
-dotenv.config();
+config();
 
 describe('Unit Tests', async () => {
     const ami = new AsteriskManagerInterface({
@@ -59,7 +59,7 @@ describe('Unit Tests', async () => {
                 return this.skip();
             }
 
-            chan_sip = await ami.moduleCheck('chan_sip');
+            chan_sip = await ami.has_chan_sip();
         });
 
         it('Detect chan_pjsip', async function () {
@@ -67,7 +67,7 @@ describe('Unit Tests', async () => {
                 return this.skip();
             }
 
-            chan_pjsip = await ami.moduleCheck('chan_pjsip');
+            chan_pjsip = await ami.has_chan_pjsip();
         });
 
         it('Detect chan_iax2', async function () {
@@ -75,7 +75,7 @@ describe('Unit Tests', async () => {
                 return this.skip();
             }
 
-            chan_iax2 = await ami.moduleCheck('chan_iax2');
+            chan_iax2 = await ami.has_chan_iax2();
         });
     });
 
@@ -85,9 +85,7 @@ describe('Unit Tests', async () => {
                 return this.skip();
             }
 
-            await ami.send({
-                Action: 'SIPpeers'
-            });
+            await ami.sip_peers();
         });
     });
 
@@ -97,9 +95,7 @@ describe('Unit Tests', async () => {
                 return this.skip();
             }
 
-            await ami.send({
-                Action: 'PJSIPShowEndpoints'
-            });
+            await ami.pjsip_endpoints();
         });
 
         it('Contacts', async function () {
@@ -107,9 +103,7 @@ describe('Unit Tests', async () => {
                 return this.skip();
             }
 
-            await ami.send({
-                Action: 'PJSIPShowContacts'
-            });
+            await ami.pjsip_contacts();
         });
     });
 
@@ -119,9 +113,17 @@ describe('Unit Tests', async () => {
                 return this.skip();
             }
 
-            await ami.send({
-                Action: 'IAXpeerlist'
-            });
+            await ami.iax2_peers();
+        });
+    });
+
+    describe('Core Tests', async () => {
+        it('Channels', async function () {
+            if (!ami.authenticated) {
+                return this.skip();
+            }
+
+            await ami.channels();
         });
     });
 });

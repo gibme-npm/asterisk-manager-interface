@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2022, Brandon Lehmann <brandonlehmann@gmail.com>
+// Copyright (c) 2016-2025, Brandon Lehmann <brandonlehmann@gmail.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -43,7 +43,7 @@ const cleanValue = (value: string, name: string): any => {
  * Helps to process response payloads by dealing with multiple packets of data
  * and then emitting the full payload once received
  */
-export default class PayloadManager extends EventEmitter {
+export class PayloadManager extends EventEmitter {
     private _buffer: Buffer = Buffer.alloc(0);
     private _timer?: Timer;
     private object: any = {};
