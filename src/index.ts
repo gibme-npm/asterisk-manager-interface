@@ -420,7 +420,8 @@ export class AsteriskManagerInterface extends EventEmitter {
             }
         });
 
-        this._socket.on('data', data => this._payloadManager.incoming(data));
+        this._socket.on('data', data =>
+            this._payloadManager.incoming(Buffer.isBuffer(data) ? data : Buffer.from(data)));
 
         return new Promise((resolve, reject) => {
             if (!this._socket) {
@@ -437,11 +438,11 @@ export class AsteriskManagerInterface extends EventEmitter {
             this._socket?.once('error', error => reject(error));
 
             if (this.options.host && this.options.port) {
+                this._socket?.setKeepAlive(true);
+                this._socket?.setNoDelay(true);
                 this._socket?.connect({
                     port: this.options.port,
-                    host: this.options.host,
-                    keepAlive: true,
-                    noDelay: true
+                    host: this.options.host
                 }, () => {
                     clearTimeout(timer);
 

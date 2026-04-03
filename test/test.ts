@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { describe, it } from 'mocha';
+import { describe, it, before, after } from 'node:test';
 import AsteriskManagerInterface from '../src';
 import { config } from 'dotenv';
 
@@ -46,33 +46,33 @@ describe('Unit Tests', async () => {
     });
 
     describe('Basic Tests', async () => {
-        it('Ping', async function () {
+        it('Ping', { skip: false }, async (t) => {
             if (!ami.authenticated) {
-                return this.skip();
+                return t.skip('Not authenticated');
             }
 
             await ami.ping();
         });
 
-        it('Detect chan_sip', async function () {
+        it('Detect chan_sip', { skip: false }, async (t) => {
             if (!ami.authenticated) {
-                return this.skip();
+                return t.skip('Not authenticated');
             }
 
             chan_sip = await ami.has_chan_sip();
         });
 
-        it('Detect chan_pjsip', async function () {
+        it('Detect chan_pjsip', { skip: false }, async (t) => {
             if (!ami.authenticated) {
-                return this.skip();
+                return t.skip('Not authenticated');
             }
 
             chan_pjsip = await ami.has_chan_pjsip();
         });
 
-        it('Detect chan_iax2', async function () {
+        it('Detect chan_iax2', { skip: false }, async (t) => {
             if (!ami.authenticated) {
-                return this.skip();
+                return t.skip('Not authenticated');
             }
 
             chan_iax2 = await ami.has_chan_iax2();
@@ -80,9 +80,9 @@ describe('Unit Tests', async () => {
     });
 
     describe('chan_sip Tests', async () => {
-        it('Peers', async function () {
+        it('Peers', { skip: false }, async (t) => {
             if (!chan_sip) {
-                return this.skip();
+                return t.skip('chan_sip not available');
             }
 
             await ami.sip_peers();
@@ -90,17 +90,17 @@ describe('Unit Tests', async () => {
     });
 
     describe('chan_pjsip Tests', async () => {
-        it('Endpoints', async function () {
+        it('Endpoints', { skip: false }, async (t) => {
             if (!chan_pjsip) {
-                return this.skip();
+                return t.skip('chan_pjsip not available');
             }
 
             await ami.pjsip_endpoints();
         });
 
-        it('Contacts', async function () {
+        it('Contacts', { skip: false }, async (t) => {
             if (!chan_pjsip) {
-                return this.skip();
+                return t.skip('chan_pjsip not available');
             }
 
             await ami.pjsip_contacts();
@@ -108,9 +108,9 @@ describe('Unit Tests', async () => {
     });
 
     describe('chan_iax2 Tests', async () => {
-        it('Peers', async function () {
+        it('Peers', { skip: false }, async (t) => {
             if (!chan_iax2) {
-                return this.skip();
+                return t.skip('chan_iax2 not available');
             }
 
             await ami.iax2_peers();
@@ -118,9 +118,9 @@ describe('Unit Tests', async () => {
     });
 
     describe('Core Tests', async () => {
-        it('Channels', async function () {
+        it('Channels', { skip: false }, async (t) => {
             if (!ami.authenticated) {
-                return this.skip();
+                return t.skip('Not authenticated');
             }
 
             await ami.channels();
